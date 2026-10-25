@@ -6,6 +6,13 @@ const props = defineProps({
   rows: { type: Array, default: () => [] }
 })
 
+const emit = defineEmits(['row-click'])
+
+// Get the value to show: use render() if the column has one
+function cellValue(row, col) {
+  return col.render ? col.render(row) : row[col.field]
+}
+
 // Sorting
 const sortField = ref('')
 const sortDir = ref('')
@@ -24,13 +31,15 @@ function toggleSort(field) {
 
 const sortedRows = computed(() => {
   if (!sortField.value) return props.rows
+  const col = props.columns.find(c => c.field === sortField.value)
   return [...props.rows].sort((a, b) => {
-    const x = a[sortField.value] ?? ''
-    const y = b[sortField.value] ?? ''
+    const x = cellValue(a, col) ?? ''
+    const y = cellValue(b, col) ?? ''
     const result = String(x).localeCompare(String(y), undefined, { numeric: true })
     return sortDir.value === 'asc' ? result : -result
   })
 })
+
 // Pagination
 const pageSize = 10
 const currentPage = ref(1)
@@ -39,13 +48,11 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(sortedRows.value.length / pageSize))
 )
 
-// Only the rows for the current page
 const pagedRows = computed(() => {
   const start = (currentPage.value - 1) * pageSize
   return sortedRows.value.slice(start, start + pageSize)
 })
 
-// For "Showing X–Y of Z"
 const startRow = computed(() =>
   sortedRows.value.length === 0 ? 0 : (currentPage.value - 1) * pageSize + 1
 )
@@ -53,13 +60,13 @@ const endRow = computed(() =>
   Math.min(currentPage.value * pageSize, sortedRows.value.length)
 )
 
-// When new data arrives (like a new search) or the sort changes, go back to page 1
+// New data or new sort: go back to page 1
 watch(() => props.rows, () => { currentPage.value = 1 })
 watch([sortField, sortDir], () => { currentPage.value = 1 })
-
 </script>
 
 <template>
+<div>
   <table class="min-w-full shadow-md rounded">
     <thead class="bg-gray-50 text-xl">
       <tr>
@@ -71,18 +78,22 @@ watch([sortField, sortDir], () => { currentPage.value = 1 })
         </th>
       </tr>
     </thead>
+
     <tbody class="divide-y divide-gray-300">
       <tr v-if="rows.length === 0">
         <td :colspan="columns.length" class="p-4 text-center text-gray-500">
           No results
         </td>
       </tr>
-        <tr v-for="(row, i) in pagedRows" :key="row._id || i">
+      <tr v-for="(row, i) in pagedRows" :key="row._id || i"
+          class="cursor-pointer hover:bg-gray-100"
+          @click="emit('row-click', row)">
         <td v-for="col in columns" :key="col.field" class="p-2 text-left">
-          {{ row[col.field] }}
+          {{ cellValue(row, col) }}
         </td>
       </tr>
     </tbody>
+
   </table>
     <div class="flex justify-between items-center mt-4">
     <span class="text-gray-600">
@@ -101,5 +112,6 @@ watch([sortField, sortDir], () => { currentPage.value = 1 })
         Next
       </button>
     </div>
+  </div>
   </div>
 </template>
