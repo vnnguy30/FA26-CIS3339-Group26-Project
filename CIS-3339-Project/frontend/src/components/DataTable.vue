@@ -33,8 +33,8 @@ const sortedRows = computed(() => {
   if (!sortField.value) return props.rows
   const col = props.columns.find(c => c.field === sortField.value)
   return [...props.rows].sort((a, b) => {
-    const x = cellValue(a, col) ?? ''
-    const y = cellValue(b, col) ?? ''
+    const x = a[sortField.value] ?? cellValue(a, col) ?? ''
+    const y = b[sortField.value] ?? cellValue(b, col) ?? ''
     const result = String(x).localeCompare(String(y), undefined, { numeric: true })
     return sortDir.value === 'asc' ? result : -result
   })
