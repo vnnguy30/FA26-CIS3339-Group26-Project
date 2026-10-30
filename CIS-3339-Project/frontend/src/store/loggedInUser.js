@@ -36,31 +36,51 @@ export const useLoggedInUserStore = defineStore({
       }
     },
     restoreSession() {
-  const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token');
 
-  if (!token) {
-    this.logout();
-    return;
-  }
+      if (!token) {
+        this.$patch({
+          name: "",
+          role: "",
+          isLoggedIn: false
+        });
+        return null;
+      }
 
-  try {
-    const decodedToken = jwt_decode(token);
+      try {
+        const decodedToken = jwt_decode(token);
 
-    if (decodedToken.exp * 1000 < Date.now()) {
-      this.logout();
-      return;
-    }
+        if (!decodedToken.exp || decodedToken.exp * 1000 <= Date.now()|| !decodedToken.name || !decodedToken.role) {
+          localStorage.removeItem('token');
 
-    this.$patch({
-      isLoggedIn: true,
-      role: decodedToken.role,
-      name: decodedToken.name
-    });
+          this.$patch({
+            name: "",
+            role: "",
+            isLoggedIn: false
+          });
 
-  } catch (error) {
-    this.logout();
-  }
-},
+          return null;
+        }
+
+        this.$patch({
+          isLoggedIn: true,
+          role: decodedToken.role,
+          name: decodedToken.name
+        });
+
+        return token;
+      } catch (error) {
+        localStorage.removeItem('token');
+
+        this.$patch({
+          name: "",
+          role: "",
+          isLoggedIn: false
+        });
+
+        return null;
+      }
+    },
 
     logout() {
       logoutUser();
