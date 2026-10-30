@@ -35,6 +35,33 @@ export const useLoggedInUserStore = defineStore({
         toast.error(error.message)
       }
     },
+    restoreSession() {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    this.logout();
+    return;
+  }
+
+  try {
+    const decodedToken = jwt_decode(token);
+
+    if (decodedToken.exp * 1000 < Date.now()) {
+      this.logout();
+      return;
+    }
+
+    this.$patch({
+      isLoggedIn: true,
+      role: decodedToken.role,
+      name: decodedToken.name
+    });
+
+  } catch (error) {
+    this.logout();
+  }
+},
+
     logout() {
       logoutUser();
       // Reset value after user log out

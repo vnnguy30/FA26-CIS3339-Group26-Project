@@ -45,5 +45,21 @@ export function setAuthHeader(token) {
     delete apiClient.defaults.headers.common['Authorization'];
   }
 }
+export async function loginUser(username, password) {
+  const response = await apiClient.post('/login', {
+    username: username,
+    password: password
+  });
 
+  const token = response.data.token;
+
+  localStorage.setItem('token', token);
+  setAuthHeader(token);
+
+  return token;
+}
+export function logoutUser() {
+  localStorage.removeItem('token');
+  setAuthHeader(null);
+}
 export default apiClient;
