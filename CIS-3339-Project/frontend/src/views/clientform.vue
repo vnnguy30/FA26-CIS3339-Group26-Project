@@ -175,86 +175,61 @@
   </main>
 </template>
 
-<script>
-//import functionalities for validation
-import useVuelidate from '@vuelidate/core'
-import { required, email, numeric, minLength, maxLength } from '@vuelidate/validators'
-import { createClient } from '../api/api'
-import { useToast } from 'vue-toastification'
+<script setup>
+import { reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import useVuelidate from '@vuelidate/core';
+import { required, email, numeric, minLength, maxLength } from '@vuelidate/validators';
+import { useToast } from 'vue-toastification';
+import { useApi } from '../composables/useApi';
+import apiClient from '../api/api';
 
-//Notifications
-const toast = useToast()
+const router = useRouter();
+const toast = useToast();
 
-export default {
-  data() {
-    return {
-      //client variable to hold new client information
-      client: {
-        firstName: null,
-        middleName: null,
-        lastName: null,
-        email: null,
-        phoneNumber: {
-          primary: null,
-          alternate: null
-        },
-        address: {
-          line1: null,
-          line2: null,
-          city: null,
-          county: null,
-          zip: null
-        },
-      }
-    }
-  },
-  setup() {
-    // Register Vuelidate
-    const v$ = useVuelidate();
-    return { v$ };
-  },
-  validations() {
-    // validations for client
-    return {
-      client: {
-        firstName: { required },
-        lastName: { required },
-        email: { required, email },
-        phoneNumber: {
-          primary: {
-            required,
-            numeric,
-            minLength: minLength(10),
-            maxLength: maxLength(10),
-          },
-        },
-        address: {
-          city: { required },
-        },
-      },
-    };
-  },
-  methods: {
-    // method called when user submits the form
-    async submitForm() {
-      // Trigger validation
-      this.v$.$validate();
+// Use reactive() for form objects instead of data()
+const client = reactive({
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: { primary: '', alternate: '' },
+  address: { line1: '', line2: '', city: '', county: '', zip: '' }
+});
 
-      if (this.v$.$error) {
-        // Form is invalid, do not proceed
-        return;
-      }
-
-      try {
-        const response = await createClient(this.client);
-        this.$router.push('/findclient')
-        toast.success(response)
-      } catch (error) {
-        toast.error(error)
-      }
+// Form Validation
+const rules = {
+  client: {
+    firstName: { required },
+    lastName: { required },
+    email: { required, email },
+    phoneNumber: {
+      primary: { required, numeric, minLength: minLength(10), maxLength: maxLength(10) }
     },
+    address: { city: { required } }
   }
-}
+};
+const v$ = useVuelidate(rules, { client });
+
+// Wrap your F2 API call
+const { execute: submitClient, error } = useApi((payload) => apiClient.post('/clients', payload));
+
+const handleSubmitForm = async () => {
+  v$.value.$validate();
+  if (v$.value.$error) {
+    toast.error('Please fix the validation errors');
+    return;
+  }
+  
+  await submitClient(client);
+  
+  if (error.value) {
+    toast.error(error.value);
+  } else {
+    toast.success('Client added successfully');
+    router.push('/findclient');
+  }
+};
 </script>
 
 
