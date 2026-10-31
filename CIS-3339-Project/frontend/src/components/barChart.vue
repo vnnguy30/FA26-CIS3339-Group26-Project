@@ -42,8 +42,3 @@ onMounted(() => {
   });
 });
 </script>
-
-<template>
-  <canvas ref="attendanceChart"></canvas>
-</template>
-
