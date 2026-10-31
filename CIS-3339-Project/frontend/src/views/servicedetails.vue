@@ -78,7 +78,7 @@
           </div>
           <!--Go back button-->
           <div class="flex justify-between mt-20 mr-20">
-            <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click="this.$router.back()">
+            <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click="$router.back()">
               Go back
             </button>
           </div>
@@ -119,50 +119,93 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import useVuelidate from '@vuelidate/core';
-import { required } from '@vuelidate/validators';
-import { useLoggedInUserStore } from "../store/loggedInUser";
-import { useToast } from 'vue-toastification';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import useVuelidate from '@vuelidate/core'
+import { required } from '@vuelidate/validators'
+import { useLoggedInUserStore } from '../store/loggedInUser'
+import { getServiceById, getEventsByServiceId, updateService, deleteService } from '../api/api'
+import { useToast } from 'vue-toastification'
 
-const route = useRoute();
-const router = useRouter();
-const toast = useToast();
-const user = useLoggedInUserStore();
+const route = useRoute()   // replaces this.$route
+const router = useRouter() // replaces this.$router
+const toast = useToast()   // notifications
+const user = useLoggedInUserStore()
 
-const service = reactive({ name: '', description: '', status: 'Active' });
-const events = ref([]);
+// ref() replaces the Options API data()
+// variable to store service information
+const service = ref({
+  name: null,
+  description: null,
+  status: null
+})
+// all events that host the service
+const events = ref([])
+// ID of the table row the mouse is hovering over (to highlight the row red)
+const hoverId = ref(null)
 
-const rules = { service: { name: { required } } };
-const v$ = useVuelidate(rules, { service });
-
-const { execute: fetchService, data: sData, error: sErr } = useApi(() => apiClient.get(`/services/${route.params.id}`));
-const { execute: fetchEvents, data: eData } = useApi(() => apiClient.get(`/services/${route.params.id}/events`)); // Adjust route if needed
-const { execute: updateService, error: uErr } = useApi((payload) => apiClient.put(`/services/${route.params.id}`, payload));
-const { execute: deleteServiceCall, error: dErr } = useApi(() => apiClient.delete(`/services/${route.params.id}`));
-
-onMounted(async () => {
-  await Promise.all([fetchService(), fetchEvents()]);
-  if (sErr.value) toast.error(sErr.value);
-  else if (sData.value) Object.assign(service, sData.value);
-  if (eData.value) events.value = eData.value;
-});
-
-const submitServiceUpdate = async () => {
-  v$.value.$validate();
-  if (v$.value.$error) { toast.error('Fix validation errors'); return; }
-  
-  await updateService(service);
-  if (uErr.value) toast.error(uErr.value); else toast.success('Service updated');
-};
-
-const deleteService = async () => {
-  if (confirm("Delete this service?")) {
-    await deleteServiceCall();
-    if (dErr.value) toast.error(dErr.value); else { toast.success("Service deleted"); router.push('/findservice'); }
+// validation rules (replaces the Options API validations() option)
+const rules = {
+  service: {
+    name: { required }
   }
-};
+}
+const v$ = useVuelidate(rules, { service })
+
+// Formats the event dates as MM/DD/YYYY
+function formatDate(date) {
+  const isoDate = new Date(date)
+  const year = isoDate.getUTCFullYear()
+  const month = String(isoDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(isoDate.getUTCDate()).padStart(2, '0')
+  return `${month}/${day}/${year}`
+}
+
+// Called when the user attempts to update the service
+async function submitServiceUpdate() {
+  // Trigger validation
+  v$.value.$validate()
+
+  if (v$.value.$error) {
+    // Form is invalid, do not proceed
+    return
+  }
+
+  try {
+    const response = await updateService(route.params.id, service.value)
+    router.push('/findservice')
+    toast.success(response)
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// Deletes the service - it can only be deleted if no event uses it
+async function submitDeleteService() {
+  try {
+    if (events.value.length !== 0) {
+      toast.info('Service can not be deleted since it is being used by events.')
+      return
+    }
+    const response = await deleteService(route.params.id)
+    toast.success(response)
+    router.push('/findservice')
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// onMounted() replaces the Options API mounted() hook: load the service and its events
+onMounted(async () => {
+  try {
+    const [serviceResponse, eventsResponse] = await Promise.all([
+      getServiceById(route.params.id),
+      getEventsByServiceId(route.params.id)
+    ])
+    service.value = serviceResponse
+    events.value = eventsResponse
+  } catch (error) {
+    toast.error(error.message)
+  }
+})
 </script>

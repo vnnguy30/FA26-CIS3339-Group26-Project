@@ -67,10 +67,25 @@
         <h3 class="italic">Click table row to view client details</h3>
       </div>
       <!--Table showing list of Clients-->
-            <div class="flex flex-col col-span-2">
+      <!--Loading state-->
+      <div v-if="loading" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-2xl font-bold text-gray-500 animate-pulse">Loading clients...</p>
+      </div>
+      <!--Error state with a retry button-->
+      <div v-else-if="error" class="flex flex-col col-span-2 bg-red-50 rounded">
+        <h3 class="px-4 py-1 text-2xl font-bold text-white bg-red-800">Could not load clients</h3>
+        <p class="p-4 text-lg text-red-900">{{ error }}</p>
+        <button class="m-4 w-32 bg-red-700 text-white rounded" type="button" @click="execute()">Try again</button>
+      </div>
+      <!--Empty state-->
+      <div v-else-if="!rows.length" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-xl text-gray-600">No clients found. Try a different search or click Clear Search.</p>
+      </div>
+      <!--Table-->
+      <div v-else class="flex flex-col col-span-2">
         <DataTable
           :columns="columns"
-          :rows="clients"
+          :rows="rows"
           @row-click="client => $router.push({ name: 'clientdetails', params: { id: client._id } })"
         />
       </div>
@@ -78,88 +93,58 @@
   </main>
 </template>
 
-<script>
-import { getClients, searchClients } from '../api/api'
-import { useToast } from 'vue-toastification'
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import apiClient from '../api/api'
+import { useApi } from '../composables/useApi'
 import DataTable from '../components/DataTable.vue'
 
-//Notifications
-const toast = useToast()
+// columns for the reusable DataTable
+const columns = [
+  { label: 'Name', field: 'name', render: c => c.firstName + ' ' + c.lastName },
+  { label: 'Phone number', field: 'phone', render: c => c.phoneNumber?.primary },
+  { label: 'City', field: 'city', render: c => c.address?.city }
+]
 
-export default {
-  components: { DataTable },
-  data() {
-    return {
-               columns: [
-           { label: 'Name', field: 'name', render: c => c.firstName + ' ' + c.lastName },
-           { label: 'Phone number', field: 'phone', render: c => c.phoneNumber?.primary },
-           { label: 'City', field: 'city', render: c => c.address?.city }
-         ],
-      //variable to store all clients and their information for the organization
-      clients: null,
-      // Parameters for search to occur
-      searchBy: '',
-      firstName: '',
-      lastName: '',
-      phoneNumber: '',
-      // variable stores the ID of the row that the mouse is currently hovering over (to highlight the row red)
-      hoverId: null,
-    }
-  },
-  mounted() {
-    // when component is mounted, load the data -
-    this.loadData()
-  },
-  methods: {
-    // method called when component is mounted
-    async loadData() {
-      // Resets all the variables
-      this.searchBy = ''
-      this.firstName = ''
-      this.lastName = ''
-      this.phoneNumber = ''
+// Parameters for search to occur (ref() replaces the Options API data())
+const searchBy = ref('')
+const firstName = ref('')
+const lastName = ref('')
+const phoneNumber = ref('')
 
-      // get list of clients
-      try {
-        const response = await getClients();
-        this.clients = response;
-      } catch (error) {
-        toast.error(error)
-      }
-    },
-    // method called when user searches for clients
-    async handleSubmitForm() {
-      // if user searched by client name
-      if (this.searchBy === 'Client Name') {
-        if (this.firstName || this.lastName) {
-          try {
-            const query = {
-              searchBy: 'name',
-              firstName: this.firstName,
-              lastName: this.lastName,
-            }
-            const response = await searchClients(query)
-            this.clients = response;
-          } catch (error) {
-            toast.error(error)
-          }
-        }
-        // if user searches by client phone number
-      } else if (this.searchBy === 'Client Number') {
-        if (this.phoneNumber) {
-          try {
-            const query = {
-              searchBy: 'number',
-              phoneNumber: this.phoneNumber
-            }
-            const response = await searchClients(query)
-            this.clients = response;
-          } catch (error) {
-            toast.error(error)
-          }
-        }
-      }
-    },
-  },
+// The request that useApi runs. It starts as "get all clients"; a search swaps it,
+// so the "Try again" button always repeats whatever the user last asked for.
+let currentCall = () => apiClient.get('/clients/')
+
+// F2: useApi gives us data, loading, error and execute (run / retry)
+const { data: clients, loading, error, execute } = useApi(() => currentCall())
+
+// rows for the table (empty until the first successful load)
+const rows = computed(() => clients.value ?? [])
+
+// Resets the search fields and loads every client (runs on mount and on Clear Search)
+function loadData() {
+  searchBy.value = ''
+  firstName.value = ''
+  lastName.value = ''
+  phoneNumber.value = ''
+  currentCall = () => apiClient.get('/clients/')
+  return execute()
 }
+
+// Called when the user searches for clients
+function handleSubmitForm() {
+  if (searchBy.value === 'Client Name' && (firstName.value || lastName.value)) {
+    const params = { searchBy: 'name', firstName: firstName.value, lastName: lastName.value }
+    currentCall = () => apiClient.get('/clients/search', { params })
+    execute()
+  } else if (searchBy.value === 'Client Number' && phoneNumber.value) {
+    const params = { searchBy: 'number', phoneNumber: phoneNumber.value }
+    currentCall = () => apiClient.get('/clients/search', { params })
+    execute()
+  }
+}
+
+// onMounted() replaces the Options API mounted() hook
+onMounted(loadData)
 </script>

@@ -77,29 +77,49 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
-import { useRouter } from 'vue-router';
-import useVuelidate from '@vuelidate/core';
-import { required } from '@vuelidate/validators';
-import { useToast } from 'vue-toastification';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { reactive } from 'vue'
+import { useRouter } from 'vue-router'
+// import vuelidate validations
+import useVuelidate from '@vuelidate/core'
+import { required } from '@vuelidate/validators'
+import { createService } from '../api/api'
+import { useToast } from 'vue-toastification'
 
-const router = useRouter();
-const toast = useToast();
+const router = useRouter() // replaces this.$router
+const toast = useToast()   // notifications
 
-const service = reactive({ name: '', description: '', status: 'Active' });
-const rules = { service: { name: { required } } };
-const v$ = useVuelidate(rules, { service });
+// reactive() replaces the Options API data(): holds the new service's information
+const service = reactive({
+  name: null,
+  description: null,
+  status: 'Active'
+})
 
-const { execute: submitService, error } = useApi((payload) => apiClient.post('/services', payload));
+// validation rules (replaces the Options API validations() option)
+const rules = {
+  service: {
+    name: { required }
+  }
+}
+const v$ = useVuelidate(rules, { service })
 
-const handleSubmitForm = async () => {
-  v$.value.$validate();
-  if (v$.value.$error) { toast.error('Please fix validation errors'); return; }
-  
-  await submitService(service);
-  if (error.value) { toast.error(error.value); } 
-  else { toast.success('Service added successfully'); router.push('/findservice'); }
-};
+// Called when the user attempts to create a new service
+async function handleSubmitForm() {
+  // Trigger validation
+  v$.value.$validate()
+
+  if (v$.value.$error) {
+    // Form is invalid, do not proceed
+    return
+  }
+
+  try {
+    const response = await createService(service)
+    toast.success(response)
+    router.push('/findservice')
+  } catch (error) {
+    // the Axios interceptor already turned the error into a readable message
+    toast.error(error.message)
+  }
+}
 </script>

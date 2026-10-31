@@ -58,10 +58,25 @@
         <h2 class="text-2xl font-bold">List of Events</h2>
         <h3 class="italic">Click table row to view event details</h3>
       </div>
-            <div class="flex flex-col col-span-2">
+      <!--Loading state-->
+      <div v-if="loading" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-2xl font-bold text-gray-500 animate-pulse">Loading events...</p>
+      </div>
+      <!--Error state with a retry button-->
+      <div v-else-if="error" class="flex flex-col col-span-2 bg-red-50 rounded">
+        <h3 class="px-4 py-1 text-2xl font-bold text-white bg-red-800">Could not load events</h3>
+        <p class="p-4 text-lg text-red-900">{{ error }}</p>
+        <button class="m-4 w-32 bg-red-700 text-white rounded" type="button" @click="execute()">Try again</button>
+      </div>
+      <!--Empty state-->
+      <div v-else-if="!rows.length" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-xl text-gray-600">No events scheduled or matching your search. Click Clear Search to see all events.</p>
+      </div>
+      <!--Table-->
+      <div v-else class="flex flex-col col-span-2">
         <DataTable
           :columns="columns"
-          :rows="events"
+          :rows="rows"
           @row-click="event => $router.push({ name: 'eventdetails', params: { id: event._id } })"
         />
       </div>
@@ -70,50 +85,67 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useToast } from 'vue-toastification';
-import DataTable from '../components/DataTable.vue';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { ref, computed, onMounted } from 'vue'
+import apiClient from '../api/api'
+import { useApi } from '../composables/useApi'
+import DataTable from '../components/DataTable.vue'
 
-const router = useRouter();
-const toast = useToast();
+// Formats an event date as MM/DD/YYYY for the table
+function formatDate(date) {
+  const isoDate = new Date(date)
+  const year = isoDate.getUTCFullYear()
+  const month = String(isoDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(isoDate.getUTCDate()).padStart(2, '0')
+  return `${month}/${day}/${year}`
+}
 
+// columns for the reusable DataTable
 const columns = [
   { label: 'Event Name', field: 'name' },
   { label: 'Event Date', field: 'date', render: e => formatDate(e.date) },
   { label: 'Event Address', field: 'address', render: e => e.address?.line1 }
-];
+]
 
-const searchBy = ref('');
-const name = ref('');
-const eventDate = ref('');
+// Parameters for search to occur (ref() replaces the Options API data())
+const searchBy = ref(null)
+const name = ref(null)
+const eventDate = ref(null)
 
-const { data: events, error, execute: fetchEvents } = useApi((isSearch, params) => {
-  return isSearch ? apiClient.get('/events/search', { params }) : apiClient.get('/events');
-});
+// The request that useApi runs. It starts as "get all events"; a search swaps it,
+// so the "Try again" button always repeats whatever the user last asked for.
+let currentCall = () => apiClient.get('/events/')
 
-const loadData = async () => {
-  searchBy.value = ''; name.value = ''; eventDate.value = '';
-  await fetchEvents(false);
-  if (error.value) toast.error(error.value);
-};
+// F2: useApi gives us data, loading, error and execute (run / retry)
+const { data: events, loading, error, execute } = useApi(() => currentCall())
 
-const handleSubmitForm = async () => {
+// rows for the table (empty until the first successful load)
+const rows = computed(() => events.value ?? [])
+
+// Resets the search fields and loads every event (runs on mount and on Clear Search)
+function loadData() {
+  searchBy.value = null
+  name.value = null
+  eventDate.value = null
+  currentCall = () => apiClient.get('/events/')
+  return execute()
+}
+
+// Called when the user searches for events
+function handleSubmitForm() {
   if (searchBy.value === 'Event Name' && name.value) {
-    await fetchEvents(true, { searchBy: 'name', name: name.value });
+    const params = { searchBy: 'name', name: name.value }
+    currentCall = () => apiClient.get('/events/search', { params })
+    execute()
   } else if (searchBy.value === 'Event Date' && eventDate.value) {
-    const formattedDate = new Date(eventDate.value).toISOString().substring(0, 10);
-    await fetchEvents(true, { searchBy: 'date', eventDate: formattedDate });
+    const params = {
+      searchBy: 'date',
+      eventDate: new Date(eventDate.value).toISOString().substring(0, 10)
+    }
+    currentCall = () => apiClient.get('/events/search', { params })
+    execute()
   }
-  if (error.value) toast.error(error.value);
-};
+}
 
-const formatDate = (date) => {
-  const d = new Date(date);
-  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
-};
-
-onMounted(() => loadData());
+// onMounted() replaces the Options API mounted() hook
+onMounted(loadData)
 </script>

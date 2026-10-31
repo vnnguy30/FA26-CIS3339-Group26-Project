@@ -155,39 +155,83 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import useVuelidate from '@vuelidate/core';
-import { required } from '@vuelidate/validators';
-import { useToast } from 'vue-toastification';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { reactive, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+// import vuelidate validations
+import useVuelidate from '@vuelidate/core'
+import { required } from '@vuelidate/validators'
+import { getServices, createEvent } from '../api/api'
+import { useToast } from 'vue-toastification'
 
-const router = useRouter();
-const toast = useToast();
+const router = useRouter() // replaces this.$router
+const toast = useToast()   // notifications
 
-const event = reactive({ name: '', services: [], date: '', address: { line1: '', line2: '', city: '', county: '', zip: '' }, description: '' });
-const servicesData = ref([]);
+// reactive() / ref() replace the Options API data()
+// the new event's information
+const event = reactive({
+  name: null,
+  description: null,
+  date: null,
+  services: [],
+  address: {
+    line1: null,
+    line2: null,
+    city: null,
+    county: null,
+    zip: null
+  },
+  attendees: []
+})
+// services shown as checkboxes (the user clicks them to add services to the event)
+const activeServices = ref([])
+// which services in the checkbox list have expanded details
+const openDescriptions = ref([])
 
-const rules = { event: { name: { required }, date: { required } } };
-const v$ = useVuelidate(rules, { event });
+// custom validators (replace the Options API validations() option)
+const validDate = (value) => {
+  const date = new Date(value)
+  return !isNaN(date)
+}
+// prevents form submission if the new event has a date before today
+const notBeforeToday = (value) => {
+  const today = new Date()
+  return value >= today.toISOString().split('T')[0]
+}
+const rules = {
+  event: {
+    name: { required },
+    date: { required, validDate, notBeforeToday }
+  }
+}
+const v$ = useVuelidate(rules, { event })
 
-const { execute: fetchServices, data: sData } = useApi(() => apiClient.get('/services'));
-const { execute: submitEvent, error } = useApi((payload) => apiClient.post('/events', payload));
+// Called when the user tries to create a new event
+async function handleSubmitForm() {
+  // Trigger validation
+  v$.value.$validate()
 
+  if (v$.value.$error) {
+    toast.error('Please fix input field errors')
+    // Form is invalid, do not proceed
+    return
+  }
+
+  try {
+    const response = await createEvent(event)
+    router.push('/findevents')
+    toast.success(response)
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// onMounted() replaces the Options API mounted() hook: load the services for the checkboxes
 onMounted(async () => {
-  await fetchServices();
-  if (sData.value) servicesData.value = sData.value;
-});
-
-const handleSubmitForm = async () => {
-  v$.value.$validate();
-  if (v$.value.$error) { toast.error('Please fix validation errors'); return; }
-  
-  event.services = event.services.map(s => s._id); // Extract IDs for backend
-  await submitEvent(event);
-  
-  if (error.value) { toast.error(error.value); } 
-  else { toast.success('Event added successfully'); router.push('/findevents'); }
-};
+  try {
+    const response = await getServices()
+    activeServices.value = response.filter(item => item.status === 'Active')
+  } catch (error) {
+    toast.error(error.message)
+  }
+})
 </script>

@@ -60,10 +60,25 @@
         <h2 class="text-2xl font-bold">List of Services</h2>
         <h3 class="italic">Click table row to view service details</h3>
       </div>
-            <div class="flex flex-col col-span-2">
+      <!--Loading state-->
+      <div v-if="loading" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-2xl font-bold text-gray-500 animate-pulse">Loading services...</p>
+      </div>
+      <!--Error state with a retry button-->
+      <div v-else-if="error" class="flex flex-col col-span-2 bg-red-50 rounded">
+        <h3 class="px-4 py-1 text-2xl font-bold text-white bg-red-800">Could not load services</h3>
+        <p class="p-4 text-lg text-red-900">{{ error }}</p>
+        <button class="m-4 w-32 bg-red-700 text-white rounded" type="button" @click="execute()">Try again</button>
+      </div>
+      <!--Empty state-->
+      <div v-else-if="!rows.length" class="flex flex-col col-span-2 items-center py-10">
+        <p class="text-xl text-gray-600">No services have been added yet, or none match your search.</p>
+      </div>
+      <!--Table-->
+      <div v-else class="flex flex-col col-span-2">
         <DataTable
           :columns="columns"
-          :rows="services"
+          :rows="rows"
           @row-click="service => $router.push({ name: 'servicedetails', params: { id: service._id } })"
         />
       </div>
@@ -72,44 +87,54 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useToast } from 'vue-toastification';
-import DataTable from '../components/DataTable.vue';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { ref, computed, onMounted } from 'vue'
+import apiClient from '../api/api'
+import { useApi } from '../composables/useApi'
+import DataTable from '../components/DataTable.vue'
 
-const router = useRouter();
-const toast = useToast();
-
+// columns for the reusable DataTable
 const columns = [
   { label: 'Service Name', field: 'name' },
-  { label: 'Service Description', field: 'description' },
-  { label: 'Service Status', field: 'status' }
-];
+  { label: 'Service Description', field: 'description' }
+]
 
-const searchBy = ref('');
-const name = ref('');
-const description = ref('');
+// Parameters for search to occur (ref() replaces the Options API data())
+const searchBy = ref('')
+const name = ref('')
+const description = ref('')
 
-const { data: services, error, execute: fetchServices } = useApi((isSearch, params) => {
-  return isSearch ? apiClient.get('/services/search', { params }) : apiClient.get('/services');
-});
+// The request that useApi runs. It starts as "get all services"; a search swaps it,
+// so the "Try again" button always repeats whatever the user last asked for.
+let currentCall = () => apiClient.get('/services/')
 
-const loadData = async () => {
-  searchBy.value = ''; name.value = ''; description.value = '';
-  await fetchServices(false);
-  if (error.value) toast.error(error.value);
-};
+// F2: useApi gives us data, loading, error and execute (run / retry)
+const { data: services, loading, error, execute } = useApi(() => currentCall())
 
-const handleSubmitForm = async () => {
+// rows for the table (empty until the first successful load)
+const rows = computed(() => services.value ?? [])
+
+// Resets the search fields and loads every service (runs on mount and on Clear Search)
+function loadData() {
+  searchBy.value = ''
+  name.value = ''
+  description.value = ''
+  currentCall = () => apiClient.get('/services/')
+  return execute()
+}
+
+// Called when the user searches for services
+function handleSubmitForm() {
   if (searchBy.value === 'Service Name' && name.value) {
-    await fetchServices(true, { searchBy: 'name', name: name.value });
+    const params = { searchBy: 'name', name: name.value }
+    currentCall = () => apiClient.get('/services/search', { params })
+    execute()
   } else if (searchBy.value === 'Service Description' && description.value) {
-    await fetchServices(true, { searchBy: 'description', description: description.value });
+    const params = { searchBy: 'description', description: description.value }
+    currentCall = () => apiClient.get('/services/search', { params })
+    execute()
   }
-  if (error.value) toast.error(error.value);
-};
+}
 
-onMounted(() => loadData());
+// onMounted() replaces the Options API mounted() hook
+onMounted(loadData)
 </script>

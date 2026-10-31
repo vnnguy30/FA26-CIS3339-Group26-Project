@@ -5,19 +5,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { Chart, registerables, Colors } from 'chart.js';
+import { ref, onMounted } from 'vue'
+import { Chart, registerables } from 'chart.js'
 
-Chart.register(...registerables);
-Chart.register(Colors);
+Chart.register(...registerables)
 
+// defineProps() replaces the Options API "props" option
 const props = defineProps({
-  label: { type: Array, required: true },
-  chartData: { type: Array, required: true }
-});
+  label: { type: Array },
+  chartData: { type: Array }
+})
 
-const zipChart = ref(null);
+// a template ref replaces this.$refs.zipChart
+const zipChart = ref(null)
 
+// onMounted() replaces the Options API mounted() hook: draw the chart once the canvas exists
 onMounted(() => {
   new Chart(zipChart.value, {
     type: 'doughnut',
@@ -33,6 +35,6 @@ onMounted(() => {
       responsive: true,
       maintainAspectRatio: true
     }
-  });
-});
+  })
+})
 </script>

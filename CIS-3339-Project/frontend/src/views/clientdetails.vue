@@ -182,7 +182,7 @@
         </div>
         <!--Go back button-->
         <div v-if="user.role === 'editor'" class="flex justify-between mt-10 mr-20">
-          <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click=this.$router.back()>
+          <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click="$router.back()">
             Go back
           </button>
         </div>
@@ -243,57 +243,159 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useLoggedInUserStore } from "../store/loggedInUser";
-import { useToast } from 'vue-toastification';
-import { useApi } from '../composables/useApi';
-import apiClient from '../api/api';
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import useVuelidate from '@vuelidate/core'
+import { required, email, numeric, minLength, maxLength } from '@vuelidate/validators'
+import VueMultiselect from 'vue-multiselect'
+import { useLoggedInUserStore } from '../store/loggedInUser'
+import {
+  getClientById, getClientEvents, getNonClientEvents,
+  registerAttendee, deregisterAttendee, updateClient, deleteClientbyId
+} from '../api/api'
+import { useToast } from 'vue-toastification'
 
-const route = useRoute();
-const router = useRouter();
-const toast = useToast();
-const user = useLoggedInUserStore();
+const route = useRoute()   // replaces this.$route
+const router = useRouter() // replaces this.$router
+const toast = useToast()   // notifications
+const user = useLoggedInUserStore()
 
-// State variables replacing data()
+// ref() replaces the Options API data()
+// events that the client is not registered in - shown in the multiselect
+const eventsFiltered = ref([])
+// events the user selects from the multiselect list
+const eventsSelected = ref([])
+// events that the selected client is associated with
+const clientEvents = ref([])
+// client information
 const client = ref({
-  firstName: '',
-  lastName: '',
-  phoneNumber: { primary: '' },
-  address: { city: '' }
-});
-const clientEvents = ref([]);
-const nonClientEvents = ref([]);
-
-// Setup multiple API calls with your F2 composable
-const { execute: fetchClient, data: clientData, error: clientError } = useApi(() => apiClient.get(`/clients/${route.params.id}`));
-const { execute: deleteClientCall, error: deleteError } = useApi(() => apiClient.delete(`/clients/${route.params.id}`));
-
-const loadData = async () => {
-  await fetchClient();
-  if (clientError.value) {
-    toast.error(clientError.value);
-  } else if (clientData.value) {
-    client.value = clientData.value;
+  firstName: null,
+  middleName: null,
+  lastName: null,
+  email: null,
+  phoneNumber: {
+    primary: null,
+    alternate: null
+  },
+  address: {
+    line1: null,
+    line2: null,
+    city: null,
+    county: null,
+    zip: null
   }
-  // You would also call your fetchClientEvents() and fetchNonClientEvents() composables here
-};
+})
+// ID of the table row the mouse is hovering over (to highlight the row red)
+const hoverId = ref(null)
 
-const deleteClient = async () => {
-  if (confirm("Are you sure you want to delete this client?")) {
-    await deleteClientCall();
-    if (deleteError.value) {
-      toast.error(deleteError.value);
-    } else {
-      toast.success("Client deleted");
-      router.push('/findclient');
-    }
+// validation rules (replace the Options API validations() option)
+const rules = {
+  client: {
+    firstName: { required },
+    lastName: { required },
+    email: { required, email },
+    phoneNumber: {
+      primary: { required, numeric, minLength: minLength(10), maxLength: maxLength(10) }
+    },
+    address: { city: { required } }
   }
-};
+}
+const v$ = useVuelidate(rules, { client })
 
-onMounted(() => {
-  loadData();
-});
+// Formats an event date as MM/DD/YYYY
+function formatDate(date) {
+  const isoDate = new Date(date)
+  const year = isoDate.getUTCFullYear()
+  const month = String(isoDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(isoDate.getUTCDate()).padStart(2, '0')
+  return `${month}/${day}/${year}`
+}
+
+// custom label for the multiselect
+function nameWithDate({ name, date }) {
+  return `${name} (${formatDate(date)})`
+}
+
+// Reloads the events the client is / is not registered in
+async function refreshEvents() {
+  clientEvents.value = await getClientEvents(route.params.id)
+  eventsFiltered.value = await getNonClientEvents(route.params.id)
+}
+
+// Removes the client from an event
+async function removeClientFromEvent(clientId, eventId) {
+  try {
+    const response = await deregisterAttendee(eventId, clientId)
+    toast.success(response)
+  } catch (error) {
+    toast.error(error.message)
+  }
+  // update the events the client is registered / not registered in
+  try {
+    await refreshEvents()
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// Adds the client to every event selected in the multiselect
+async function addClientToEvent() {
+  try {
+    const clientId = client.value._id
+    await Promise.all(eventsSelected.value.map((event) => registerAttendee(event._id, clientId)))
+    await refreshEvents()
+    eventsSelected.value = []
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// Updates the client's information
+async function submitUpdateClient() {
+  // Trigger validation
+  v$.value.$validate()
+
+  if (v$.value.$error) {
+    // Form is invalid, do not proceed
+    return
+  }
+
+  try {
+    const response = await updateClient(route.params.id, client.value)
+    router.push('/findclient')
+    toast.success(response)
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// Deletes the client
+async function submitDeleteClient() {
+  try {
+    const response = await deleteClientbyId(route.params.id)
+    toast.success(response)
+    router.push('/findclient')
+  } catch (error) {
+    toast.error(error.message)
+  }
+}
+
+// onMounted() replaces the Options API mounted() hook:
+// load the client, the events they are registered in, and the events they are not
+onMounted(async () => {
+  try {
+    const [clientResponse, clientEventsResponse, nonClientEventsResponse] = await Promise.all([
+      getClientById(route.params.id),
+      getClientEvents(route.params.id),
+      getNonClientEvents(route.params.id)
+    ])
+    client.value = clientResponse
+    clientEvents.value = clientEventsResponse
+    eventsFiltered.value = nonClientEventsResponse
+  } catch (error) {
+    toast.error(error.message)
+  }
+})
 </script>
 
 <!--Style for multiselect-->
