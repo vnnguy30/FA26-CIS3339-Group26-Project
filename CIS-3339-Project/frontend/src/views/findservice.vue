@@ -71,85 +71,45 @@
   </main>
 </template>
 
-<script>
-import { getServices, searchServices } from '../api/api'
-import { useToast } from 'vue-toastification'
-import DataTable from '../components/DataTable.vue'
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useToast } from 'vue-toastification';
+import DataTable from '../components/DataTable.vue';
+import { useApi } from '../composables/useApi';
+import apiClient from '../api/api';
 
-//Notifications
-const toast = useToast()
+const router = useRouter();
+const toast = useToast();
 
-export default {
-  components: { DataTable },
-  data() {
-    return {
-            columns: [
-        { label: 'Service Name', field: 'name' },
-        { label: 'Service Description', field: 'description' }
-      ],
-      //variable to hold the services for the organization
-      services: null,
-      // Parameters for search to occur
-      searchBy: null,
-      name: null,
-      description: null,
-      // variable stores the ID of the row that the mouse is currently hovering over (to highlight the row red)
-      hoverId: null,
-    }
-  },
-  mounted() {
-    // when component is mounted, load the data
-    this.loadData();
-  },
-  methods: {
-    // method called when component is mounted
-    async loadData() {
-      // Resets all the variables
-      this.searchBy = ''
-      this.name = ''
-      this.description = ''
+const columns = [
+  { label: 'Service Name', field: 'name' },
+  { label: 'Service Description', field: 'description' },
+  { label: 'Service Status', field: 'status' }
+];
 
-      // get list of services
-      try {
-        const response = await getServices();
-        this.services = response;
-      } catch (error) {
-        toast.error(error)
-      }
-    },
+const searchBy = ref('');
+const name = ref('');
+const description = ref('');
 
-    // method called when user searches for a service
-    async handleSubmitForm() {
-      // if user searches by service name
-      if (this.searchBy === 'Service Name') {
-        if (this.name) {
-          try {
-            const query = {
-              searchBy: 'name',
-              name: this.name
-            }
-            const response = await searchServices(query)
-            this.services = response;
-          } catch (error) {
-            toast.error(error)
-          }
-        }
-        // if user searches by service description
-      } else if (this.searchBy === 'Service Description') {
-        if (this.description) {
-          try {
-            const query = {
-              searchBy: 'description',
-              description: this.description
-            }
-            const response = await searchServices(query)
-            this.services = response;
-          } catch (error) {
-            toast.error('Error searching services:', error)
-          }
-        }
-      }
-    },
-  },
-}
+const { data: services, error, execute: fetchServices } = useApi((isSearch, params) => {
+  return isSearch ? apiClient.get('/services/search', { params }) : apiClient.get('/services');
+});
+
+const loadData = async () => {
+  searchBy.value = ''; name.value = ''; description.value = '';
+  await fetchServices(false);
+  if (error.value) toast.error(error.value);
+};
+
+const handleSubmitForm = async () => {
+  if (searchBy.value === 'Service Name' && name.value) {
+    await fetchServices(true, { searchBy: 'name', name: name.value });
+  } else if (searchBy.value === 'Service Description' && description.value) {
+    await fetchServices(true, { searchBy: 'description', description: description.value });
+  }
+  if (error.value) toast.error(error.value);
+};
+
+onMounted(() => loadData());
 </script>

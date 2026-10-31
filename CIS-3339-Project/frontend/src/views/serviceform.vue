@@ -76,59 +76,30 @@
     </main>
 </template>
 
-<script>
-// import vuelidate validations
-import useVuelidate from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
-import { createService } from '../api/api'
-import { useToast } from 'vue-toastification'
+<script setup>
+import { reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import useVuelidate from '@vuelidate/core';
+import { required } from '@vuelidate/validators';
+import { useToast } from 'vue-toastification';
+import { useApi } from '../composables/useApi';
+import apiClient from '../api/api';
 
-//Notifications
-const toast = useToast()
+const router = useRouter();
+const toast = useToast();
 
-export default {
-    data() {
-        return {
-            //variable to hold new service information
-            service: {
-                name: null,
-                description: null,
-                status: "Active",
-            },
-        }
-    },
-    setup() {
-        // Register Vuelidate
-        const v$ = useVuelidate();
-        return { v$ };
-    },
-    validations() {
-        // validations for service
-        return {
-            service: {
-                name: { required },
-            }
-        }
-    },
-    methods: {
-        // method called when user attempts to create new service
-        async handleSubmitForm() {
-            // Trigger validation
-            this.v$.$validate();
+const service = reactive({ name: '', description: '', status: 'Active' });
+const rules = { service: { name: { required } } };
+const v$ = useVuelidate(rules, { service });
 
-            if (this.v$.$error) {
-                // Form is invalid, do not proceed
-                return;
-            }
+const { execute: submitService, error } = useApi((payload) => apiClient.post('/services', payload));
 
-            try {
-                const response = await createService(this.service);
-                toast.success(response)
-                this.$router.push('/findservice')
-            } catch (error) {
-                toast.error('Error creating new service:', error)
-            }
-        },
-    }
-}
+const handleSubmitForm = async () => {
+  v$.value.$validate();
+  if (v$.value.$error) { toast.error('Please fix validation errors'); return; }
+  
+  await submitService(service);
+  if (error.value) { toast.error(error.value); } 
+  else { toast.success('Service added successfully'); router.push('/findservice'); }
+};
 </script>
