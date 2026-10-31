@@ -15,6 +15,7 @@
             <span class="text-gray-700">First Name</span>
             <span style="color: #ff0000">*</span>
             <input type="text"
+            :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               placeholder v-model="client.firstName" />
           </label>
@@ -29,6 +30,7 @@
           <label class="block">
             <span class="text-gray-700">Middle Name</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               placeholder v-model="client.middleName" />
           </label>
@@ -40,6 +42,7 @@
             <span class="text-gray-700">Last Name</span>
             <span style="color: #ff0000">*</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               placeholder v-model="client.lastName" />
           </label>
@@ -54,6 +57,7 @@
           <label class="block">
             <span class="text-gray-700">Email</span>
             <input type="email"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.email" />
           </label>
@@ -68,6 +72,7 @@
             <span class="text-gray-700">Phone Number</span>
             <span style="color: #ff0000">*</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               pattern="^[0-9]{3}[0-9]{3}[0-9]{4}$" v-model="client.phoneNumber.primary" />
           </label>
@@ -89,6 +94,7 @@
           <label class="block">
             <span class="text-gray-700">Alternative Phone Number</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               pattern="[0-9]{3}[0-9]{3}[0-9]{4}" v-model="client.phoneNumber.alternate" />
           </label>
@@ -103,6 +109,7 @@
           <label class="block">
             <span class="text-gray-700">Address Line 1</span>
             <input type="text"
+            :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.address.line1" />
           </label>
@@ -112,6 +119,7 @@
           <label class="block">
             <span class="text-gray-700">Address Line 2</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.address.line2" />
           </label>
@@ -122,6 +130,7 @@
             <span class="text-gray-700">City</span>
             <span style="color: #ff0000">*</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.address.city" />
           </label>
@@ -136,6 +145,7 @@
           <label class="block">
             <span class="text-gray-700">County</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.address.county" />
           </label>
@@ -145,6 +155,7 @@
           <label class="block">
             <span class="text-gray-700">Zip Code</span>
             <input type="text"
+              :disabled="user.role === 'viewer'"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               v-model="client.address.zip" />
           </label>
@@ -156,21 +167,21 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
         <div class="flex justify-between mt-10 mr-20"></div>
         <!--Update Client submit button-->
-        <div class="flex justify-between mt-10 mr-20">
+        <div v-if="user.role === 'editor'" class="flex justify-between mt-10 mr-20">
           <button @click="submitUpdateClient" type="submit" class="bg-green-700 disabled:opacity-50 text-white rounded"
             :disabled="user.role === 'viewer'">
             Update Client
           </button>
         </div>
         <!--Delete Client button-->
-        <div class="flex justify-between mt-10 mr-20">
+        <div v-if="user.role === 'editor'" class="flex justify-between mt-10 mr-20">
           <button @click="submitDeleteClient" type="submit" class="bg-red-700 disabled:opacity-50 text-white rounded"
             :disabled="user.role === 'viewer'">
             Delete Client
           </button>
         </div>
         <!--Go back button-->
-        <div class="flex justify-between mt-10 mr-20">
+        <div v-if="user.role === 'editor'" class="flex justify-between mt-10 mr-20">
           <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click=this.$router.back()>
             Go back
           </button>
@@ -204,7 +215,7 @@
               <td class="p-2 text-right">
                 <span class="remove-btn-wrapper">
                   <span class="remove-btn text-gray-400 cursor-pointer"
-                    @click.stop="removeClientFromEvent(client._id, event._id)" v-if="hoverId === event._id">X</span>
+                    @click.stop="removeClientFromEvent(client._id, event._id)" v-if="hoverId === event._id && user.role === 'editor'">X</span>
                 </span>
               </td>
             </tr>

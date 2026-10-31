@@ -15,6 +15,7 @@
               <span class="text-gray-700">Service Name</span>
               <span style="color: #ff0000">*</span>
               <input type="text"
+                :disabled="user.role === 'viewer'"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                 v-model="service.name" />
             </label>
@@ -28,6 +29,7 @@
             <label>
               <span class="text-gray-700">Description:</span>
               <textarea
+                :disabled="user.role === 'viewer'"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                 v-model="service.description"></textarea>
             </label>
@@ -43,11 +45,11 @@
               <span style="color: #ff0000">*</span>
               <div class="mt-1">
                 <label class="inline-flex items-center">
-                  <input type="radio" class="form-radio" value="Active" v-model="service.status">
+                  <input type="radio" class="form-radio" value="Active" v-model="service.status" :disabled="user.role === 'viewer'">
                   <span class="ml-2">Active</span>
                 </label>
                 <label class="inline-flex items-center ml-6">
-                  <input type="radio" class="form-radio" value="Inactive" v-model="service.status">
+                  <input type="radio" class="form-radio" value="Inactive" v-model="service.status" :disabled="user.role === 'viewer'">
                   <span class="ml-2">Inactive</span>
                 </label>
               </div>
@@ -59,7 +61,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
           <div></div>
           <!-- Update Service button -->
-          <div class="flex justify-between mt-10 mr-20">
+          <div v-if="user.role === 'editor'" class="flex justify-between mt-10 mr-20">
             <div class="flex justify-between mt-10 mr-25">
               <button @click="submitServiceUpdate" type="submit" class="bg-green-700 disabled:opacity-50 text-white rounded"
                 :disabled="user.role === 'viewer'">
@@ -68,7 +70,7 @@
             </div>
           </div>
           <!--Delete Service button-->
-          <div class="flex justify-between mt-20 mr-20">
+          <div v-if="user.role === 'editor'" class="flex justify-between mt-20 mr-20">
             <button @click="submitDeleteService" type="submit" class="bg-red-700 disabled:opacity-50 text-white rounded"
               :disabled="user.role === 'viewer'">
               Delete Service
