@@ -89,42 +89,47 @@
   </main>
 </template>
 
-<script>
-import { useLoggedInUserStore } from './store/loggedInUser'
-import { getOrgName } from './api/api'
-import { useToast } from 'vue-toastification'
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useLoggedInUserStore } from './store/loggedInUser';
+import { useToast } from 'vue-toastification';
+import { useApi } from './composables/useApi';
+import apiClient from './api/api';
 
-//Notifications
-const toast = useToast()
+const router = useRouter();
+const toast = useToast();
+const user = useLoggedInUserStore();
 
-export default {
-  setup() {
-    const user = useLoggedInUserStore();
-    return { user };
-  },
-  data() {
-    return {
-      orgName: "Dataplatform",
-    };
-  },
-  async created() {
-    try {
-      this.orgName = await getOrgName();
-    } catch {
-      throw (error)
-    }
-  },
-  methods: {
-    logout() {
-      try {
-        this.$store.dispatch('clearSessionData');
-        this.$router.push('/')
-      } catch (error) {
-        toast.error('logout error', error)
-      }
-    },
+const orgName = ref("Dataplatform");
+
+// F2 Composable API Call
+const { data: orgData, error, execute: fetchOrgName } = useApi(() => {
+  return apiClient.get('/org'); // Connects directly to backend
+});
+
+const loadOrgName = async () => {
+  await fetchOrgName();
+  if (error.value) {
+    toast.error(error.value);
+  } else if (orgData.value && orgData.value.name) {
+    orgName.value = orgData.value.name;
   }
-}
+};
+
+// Handled directly via the Pinia store action
+const logout = () => {
+  try {
+    user.logout();
+    router.push('/');
+  } catch (err) {
+    toast.error('Logout error: ' + err.message);
+  }
+};
+
+onMounted(() => {
+  loadOrgName();
+});
 </script>
 
 <style scoped>
