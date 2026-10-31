@@ -5,7 +5,9 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon app.js"
+    "start": "nodemon app.js",
+    "db:init": "node scripts/db-init.js",
+    "db:reset": "node scripts/db-init.js --reset"
   },
   "dependencies": {
     "bcrypt": "^5.1.0",
