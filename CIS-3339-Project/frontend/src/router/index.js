@@ -45,9 +45,9 @@ const routes = [
   },
   {
     path: '/eventdetails/:id',
-    name: 'eventdetails',
+Migrate thatfile.vue to Composition API    name: 'eventdetails',
     meta: { requiresAuth: true },
-    component: () => import('../views/eventdetails.vue')
+    component: () => import('../views/eventDetails.vue')
   },
   {
     path: '/serviceform',
