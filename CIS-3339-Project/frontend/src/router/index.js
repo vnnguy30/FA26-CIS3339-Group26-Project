@@ -16,7 +16,7 @@ const routes = [
     path: '/clientform',
     name: 'clientform',
     // only authenticated users can create clients
-    meta: { requiresAuth: true , requiresEditor: true },
+    meta: { requiresAuth: true },
     component: () => import('../views/clientform.vue')
   },
   {
@@ -34,7 +34,7 @@ const routes = [
   {
     path: '/eventform',
     name: 'eventform',
-    meta: { requiresAuth: true , requiresEditor: true },
+    meta: { requiresAuth: true },
     component: () => import('../views/eventform.vue')
   },
   {
@@ -45,14 +45,14 @@ const routes = [
   },
   {
     path: '/eventdetails/:id',
-Migrate thatfile.vue to Composition API    name: 'eventdetails',
+    name: 'eventdetails',
     meta: { requiresAuth: true },
     component: () => import('../views/eventDetails.vue')
   },
   {
     path: '/serviceform',
     name: 'serviceform',
-    meta: { requiresAuth: true , requiresEditor: true },
+    meta: { requiresAuth: true },
     component: () => import('../views/serviceform.vue')
   },
   {
@@ -69,7 +69,7 @@ Migrate thatfile.vue to Composition API    name: 'eventdetails',
   }
 ]
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
@@ -82,9 +82,6 @@ router.beforeEach((to) => {
       // save the location we were at to come back later
       query: { redirect: to.fullPath },
     }
-  }
-  if (to.meta.requiresEditor && store.role !== 'editor') {
-    return '/'
   }
 })
 
