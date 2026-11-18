@@ -46,16 +46,49 @@ app.use('/org', require('./routes/org'));
 app.use('/services', require('./routes/services'));
 app.use('/users', require('./routes/users'));
 
+// B2: health check — no login needed
+app.get('/health', (req, res) => {
+  // readyState 1 means Mongoose is connected to MongoDB
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'error',
+    db: dbConnected ? 'connected' : 'disconnected'
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-// error handler
-app.use(function (err, req, res, next) {
-  // logs error and error code to console
-  console.error(err.message, req);
-  if (!err.statusCode) {
-    err.statusCode = 500;
+// B2: unknown routes -> 404 in the same JSON shape
+app.use((req, res, next) => {
+  const err = new Error('Route not found');
+  err.statusCode = 404;
+  next(err);
+});
+
+// B2: centralized error handler (must be registered after all routes)
+app.use((err, req, res, next) => {
+  let status = err.statusCode || 500;
+  let message = err.message;
+
+  // Mongoose validation error (missing/invalid fields) -> 400
+  if (err.name === 'ValidationError') {
+    status = 400;
+    message = Object.values(err.errors).map(e => e.message).join(', ');
   }
-  res.status(err.statusCode).send(err.message);
+
+  // Invalid MongoDB id (e.g. /clients/abc) -> 400
+  if (err.name === 'CastError') {
+    status = 400;
+    message = 'Invalid id';
+  }
+
+  // Unexpected server errors: log the details for us, but hide them from the user
+  if (status >= 500) {
+    console.error(err);
+    message = 'Something went wrong on the server';
+  }
+
+  res.status(status).json({ error: message });
 });
