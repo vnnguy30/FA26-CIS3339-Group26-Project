@@ -9,6 +9,7 @@ const authMiddleWare = require("../auth/authMiddleWare");
 
 // importing data model schemas
 const { events, clients } = require("../models/models");
+const httpError = require("../utils/httpError");
 
 // API endpoint to get all events for org
 router.get("/", authMiddleWare, (req, res, next) => {
@@ -30,7 +31,7 @@ router.get("/id/:id", authMiddleWare, (req, res, next) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send("Event not found");
+      return next(httpError(404, "Event not found"));
     } else {
       res.json(data);
     }
@@ -49,7 +50,7 @@ router.get("/search/", authMiddleWare, (req, res, next) => {
       dbQuery.date = req.query.eventDate;
       break;
     default:
-      return res.status(400).send("invalid searchBy");
+      return next(httpError(400, "Invalid searchBy"));
   }
   events.find(dbQuery, (error, data) => {
     if (error) {
@@ -95,7 +96,7 @@ router.get("/attendees/:id", authMiddleWare, (req, res, next) => {
       return next(error);
     } else {
       if (!event)
-        res.status(400).send("Event not found")
+        return next(httpError(404, "Event not found"));
       else {
         const attendeeIds = event.attendees.map((attendee) =>
           attendee.toString()
@@ -146,6 +147,8 @@ router.put("/update/:id", authMiddleWare, (req, res, next) => {
     (error, data) => {
       if (error) {
         return next(error);
+      } else if (!data) {
+        return next(httpError(404, "Event not found"));
       } else {
         res.status(200).send("Event updated successfully");
       }
@@ -213,7 +216,7 @@ router.delete("/:id", authMiddleWare, (req, res, next) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send("Event not found");
+      return next(httpError(404, "Event not found"));
     } else {
       // only delete event if no clients are signed up
       if (data.attendees.length === 0) {
@@ -223,14 +226,14 @@ router.delete("/:id", authMiddleWare, (req, res, next) => {
             if (error) {
               return next(error);
             } else if (!data) {
-              res.status(400).send("Event not found");
+              return next(httpError(404, "Event not found"));
             } else {
               res.status(200).send("Event deleted successfully");
             }
           }
         );
       } else {
-        res.status(400).send("Event has attendees and can't be deleted.");
+        return next(httpError(409, "Event has attendees and can't be deleted"));
       }
     }
   });
