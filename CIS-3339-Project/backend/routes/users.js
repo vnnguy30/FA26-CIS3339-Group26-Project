@@ -8,22 +8,23 @@ const jwt = require('jsonwebtoken');
 
 // import users data model schema
 const { users } = require('../models/models');
+const httpError = require('../utils/httpError');
 
 const org = process.env.ORG_ID;
 
 // API endpoint to handle login
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   const { username, password } = req.body;
 
   try {
     const user = await users.findOne({ username: username, org: org });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid username' });
+      return next(httpError(401, 'Invalid username or password'));
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid username or password' });
+      return next(httpError(401, 'Invalid username or password'));
     }
 
     const payload = {
@@ -35,7 +36,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ token });
   } catch (err) {
-    res.status(500).send('Server error');
+    next(err);
   }
 });
 
