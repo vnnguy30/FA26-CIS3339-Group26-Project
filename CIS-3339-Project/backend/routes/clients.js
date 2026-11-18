@@ -10,17 +10,18 @@ const authMiddleWare = require('../auth/authMiddleWare');
 // importing data model schemas
 const { clients, events } = require('../models/models');
 const { ObjectId } = require('mongodb');
+const httpError = require('../utils/httpError');
 
 // reading the org id from the environment variable
 const org = process.env.ORG_ID;
 
 // API Endpoint to Get all clients
-router.get('/', authMiddleWare, async (req, res) => {
+router.get('/', authMiddleWare, async (req, res, next) => {
   try {
     const cli = await clients.find({});
     res.json(cli);
   } catch (err) {
-    res.status(500).send(err.message);
+      next(err);
   }
 });
 
@@ -30,7 +31,7 @@ router.get('/id/:id', authMiddleWare, (req, res, next) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send('Client not found');
+      return next(httpError(404, 'Client not found'));
     } else {
       res.json(data);
     }
@@ -73,7 +74,7 @@ router.get('/search', authMiddleWare, (req, res, next) => {
       }
       break;
     default:
-      return res.status(400).send("invalid searchBy");
+      return next(httpError(400, 'Invalid searchBy'));
   }
 
   dbQuery["$and"] = queryArray;
@@ -106,7 +107,7 @@ router.put("/update/:id", authMiddleWare, (req, res, next) => {
       return next(error);
     } else {
       if (!data)
-        res.status(400).send("Client not found.")
+        return next(httpError(404, 'Client not found'));
       else
         res.status(201).send("Client updated successfully");
     }
@@ -119,7 +120,7 @@ router.delete("/:id", authMiddleWare, (req, res, next) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send("Client not found");
+      return next(httpError(404, 'Client not found'));
     } else {
       events.find({ attendees: req.params.id, org: org }, (error, data) => {
         if (error) {
@@ -131,13 +132,13 @@ router.delete("/:id", authMiddleWare, (req, res, next) => {
               if (error) {
                 return next(error);
               } else if (!data) {
-                res.status(400).send('Client not found');
+                return next(httpError(404, 'Client not found'));
               } else {
                 res.status(200).send("Client deleted successfully");
               }
             });
           else 
-            res.status(406).send("Client is signed up for events and can't be deleted.");
+            return next(httpError(409, "Client is signed up for events and can't be deleted"));
         }
       });
     }
