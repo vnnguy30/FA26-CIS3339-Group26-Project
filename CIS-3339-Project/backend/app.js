@@ -69,7 +69,7 @@ app.use((req, res, next) => {
 
 // B2: centralized error handler (must be registered after all routes)
 app.use((err, req, res, next) => {
-  let status = err.statusCode || 500;
+  let status = err.statusCode || err.status || 500;
   let message = err.message;
 
   // Mongoose validation error (missing/invalid fields) -> 400
