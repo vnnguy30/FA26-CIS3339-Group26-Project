@@ -4,6 +4,7 @@ const router = express.Router();
 
 // import services schema
 const { services, events } = require('../models/models');
+const httpError = require('../utils/httpError');
 
 // Middleware for authorization. For API calls that require authorization, this middleware checks if the header of API calls have a valid security token. If no security token or invalid security token, then the API call is not made.
 const authMiddleWare = require('../auth/authMiddleWare');
@@ -30,7 +31,7 @@ router.get('/id/:id', authMiddleWare, (req, res, next) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send('Service not found');
+      return next(httpError(404, 'Service not found'));
     } else {
       res.json(data);
     }
@@ -51,7 +52,7 @@ router.get('/search', authMiddleWare, (req, res, next) => {
       };
       break;
     default:
-      return res.status(400).send('invalid searchBy');
+      return next(httpError(400, 'Invalid searchBy'));
   }
   services.find(dbQuery, (error, data) => {
     if (error) {
@@ -82,7 +83,7 @@ router.put('/update/:id', authMiddleWare, (req, res, next) => {
       return next(error);
     } else {
       if (!data)
-        res.status(400).send("Service not found.")
+        return next(httpError(404, 'Service not found'));
       else
         res.status(201).send('Service updated successfully');
     }
@@ -92,20 +93,22 @@ router.put('/update/:id', authMiddleWare, (req, res, next) => {
 // API endpoint to hard DELETE event by ID
 router.delete('/:id', authMiddleWare, async (req, res, next) => {
   // only delete service if no events are using that service
-  const serviceEvents = await events.find({ services: req.params.id, org: org })
+    let serviceEvents;
+  try {
+    serviceEvents = await events.find({ services: req.params.id, org: org });
+  } catch (err) {
+    return next(err);
+  }
 
   if (serviceEvents.length !== 0) {
-    res
-        .status(400)
-        .send('Service can not be deleted since it is being used by events.');
-    return;
+    return next(httpError(409, 'Service can not be deleted since it is being used by events'));
   }
 
   services.findOne({ _id: req.params.id, org: org }, (error, data) => {
     if (error) {
       return next(error);
     } else if (!data) {
-      res.status(400).send('Service not found');
+      return next(httpError(404, 'Service not found'));
     } else {
       services.findOneAndDelete(
         { _id: req.params.id, org: org },
@@ -113,7 +116,7 @@ router.delete('/:id', authMiddleWare, async (req, res, next) => {
           if (error) {
             return next(error);
           } else if (!data) {
-            res.status(400).send('Service not found');
+            return next(httpError(404, 'Service not found'));
           } else {
             res.status(200).send('Service deleted successfully');
           }
