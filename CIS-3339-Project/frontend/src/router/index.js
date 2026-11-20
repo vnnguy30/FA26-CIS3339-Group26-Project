@@ -83,6 +83,11 @@ router.beforeEach((to) => {
       query: { redirect: to.fullPath },
     }
   }
+
+  // F4: only editors can reach editor-only routes
+  if (to.meta.requiresEditor && store.role !== 'editor') {
+    return { path: '/' }
+  }
 })
 
 export default router
