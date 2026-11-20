@@ -29,7 +29,10 @@ router.post('/login', async (req, res, next) => {
 
     const payload = {
       name: user.username,
-      role: user.role
+      role: user.role,
+      // S1: the organization comes from the user record in the DB, and every
+      // route reads it from the token (req.user.orgId) to scope its queries
+      orgId: user.org.toString()
     };
 
     // token expires in 30 days. This is not best security practice but still demonstrates how JWT work
