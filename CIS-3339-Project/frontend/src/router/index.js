@@ -15,8 +15,8 @@ const routes = [
   {
     path: '/clientform',
     name: 'clientform',
-    // only authenticated users can create clients
-    meta: { requiresAuth: true },
+    // F4: only editors can create clients
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/clientform.vue')
   },
   {
@@ -34,7 +34,7 @@ const routes = [
   {
     path: '/eventform',
     name: 'eventform',
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/eventform.vue')
   },
   {
@@ -52,7 +52,7 @@ const routes = [
   {
     path: '/serviceform',
     name: 'serviceform',
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/serviceform.vue')
   },
   {
@@ -84,11 +84,12 @@ router.beforeEach((to) => {
     }
   }
 
-  // F4: only editors can reach editor-only routes
+  // F4: editor-only routes. Allowlist: anything that is not exactly 'editor'
+  // (viewer, unknown role, empty role) is sent back to the dashboard.
+  // This is UX only - the backend enforces the same rule with requireRole('editor').
   if (to.meta.requiresEditor && store.role !== 'editor') {
     return { path: '/' }
   }
 })
 
 export default router
-
